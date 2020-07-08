@@ -30,9 +30,10 @@ class MatchedFilterDetector(RangeDetector):
 	def calculate_raw(self, rx_wform):
 		return np.fft.ifft(np.multiply(np.conj(self.ref_fft), np.fft.fft(rx_wform)))
 
+class ClassicFMCWDetector(RangeDetector):
 
-def baseband_phasor(f, N):
-	return np.exp(1j * 2 * np.pi * f * np.arange(N))
+	def calculate_raw(self, rx_wform):
+		return np.fft.fft(np.multiply(np.conj(self.ref), rx_wform))
 
 
 if __name__ == '__main__':
