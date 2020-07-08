@@ -16,6 +16,24 @@ def baseband_chirp(B, N):
 	return np.exp(1j * baseband_chirp_phase(B, N))
 
 
+class RangeDetector(object):
+
+	def __init__(self, ref_wform):
+		self.ref = ref_wform
+		self.ref_fft = np.fft.fft(self.ref)
+
+	def calculate_raw(self, rx_wform):
+		return np.full_like(rx_wform, 0)
+
+class MatchedFilterDetector(RangeDetector):
+
+	def calculate_raw(self, rx_wform):
+		return np.fft.ifft(np.multiply(np.conj(self.ref_fft), np.fft.fft(rx_wform)))
+
+
+def baseband_phasor(f, N):
+	return np.exp(1j * 2 * np.pi * f * np.arange(N))
+
 
 if __name__ == '__main__':
 
@@ -34,42 +52,21 @@ if __name__ == '__main__':
 	bx[0:Ns] = np.ones(Ns, dtype=float)
 	bf = np.fft.fft(bx)
 
-	# Time domain plot.
-	plt.figure()
-	plt.plot(np.real(cx), '+-', label='chirp')
-	plt.plot(bx, '+-', label='box')
-
-	# Frequency domain plot.
-	plt.figure()
-	plt.plot(np.fft.fftshift(np.abs(cf)), '+-', label='chirp')
-	plt.plot(np.fft.fftshift(np.abs(bf)), '+-', label='box')
-
 	# Delay signals.
 	cx_d = np.roll(np.copy(cx), 1000)
 	bx_d = np.roll(np.copy(bx), 1000)
 
-	# Perform matched filtering. (currently, doesn't work)
-	cf_d = np.fft.fft(np.flip(np.conj(cx_d)))
-	bf_d = np.fft.fft(np.flip(np.conj(bx_d)))
+	# Create detectors.
+	chirp_mfilter = MatchedFilterDetector(cx)
+	box_mfilter = MatchedFilterDetector(bx)
 
-	# cf_o = np.zeros(N, dtype=np.complex128)
-	# bf_o = np.zeros(N, dtype=np.complex128)
-	# for i in range(N):
-	# 	cf_o[i] = cf[i] * cf_d[i]
-	# 	bf_o[i] = bf[i] * bf_d[i]
+	# Run delayed signals through detectors.
+	craw = chirp_mfilter.calculate_raw(cx_d)
+	braw = box_mfilter.calculate_raw(bx_d)
 
-	cf_o = np.multiply(cf, cf_d)
-	bf_o = np.multiply(bf, bf_d)
-	cx_o = np.fft.ifft(cf_o)
-	bx_o = np.fft.ifft(bf_o)
-
-
-	# cf_o = np.convolve(cx_d, np.flip(np.conj(cx)), 'same')
-
-	# plt.figure()
-	# plt.plot(np.fft.fftshift(np.abs(cf_o)), '+-', label='chirp')
-	# plt.plot(np.fft.fftshift(np.abs(bf_o)), '+-', label='box')
+	# Plot results.
+	plt.plot(np.abs(craw), label='matched filter output, chirp')
+	plt.plot(np.abs(braw), label='matched filter output, box')
+	plt.legend()
 
 	IPython.embed()
-
-	# pass
