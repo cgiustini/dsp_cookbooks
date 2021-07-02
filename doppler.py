@@ -6,7 +6,7 @@ from fmcw import MatchedFilterDetector, ClassicFMCWDetector, baseband_chirp
 
 if __name__ == '__main__':
 
-	B = 2 * np.pi * 0.1
+	B = 2 * np.pi * 0.01
 	Ns = 2048
 
 	N = Ns
@@ -22,7 +22,9 @@ if __name__ == '__main__':
 	bf = np.fft.fft(bx)
 
 	# Delay signals.
-	cx_d = np.roll(np.copy(cx), 1024)
+	dly = 1024
+	cx_d = np.roll(np.copy(cx), dly)
+	cx_d[0:d]
 	bx_d = np.roll(np.copy(bx), 1024)
 		
 
@@ -36,8 +38,9 @@ if __name__ == '__main__':
 	# craw = chirp_mfilter.calculate_raw(cx_d)
 	# braw = box_mfilter.calculate_raw(bx_d)
 
-	Nfs = 1000
-	fs = np.linspace(-0.2, 0.2, Nfs)
+	Nfs = 1
+	# fs = np.linspace(-0.2, 0.2, Nfs)
+	fs = [0.0]
 	# Nfs = 1
 	# fs = [0]
 
@@ -47,7 +50,8 @@ if __name__ == '__main__':
 	for i, f in enumerate(fs):
 
 		phasor =  np.exp(-1j * 2 * np.pi * f * np.arange(N))
-		cx_d_dshift = np.multiply(cx_d, phasor)
+		# cx_d_dshift = np.multiply(cx_d, phasor)
+		cx_d_dshift = cx_d
 		craw = chirp_mfilter.calculate_raw(cx_d_dshift)
 		doppler_mfilter[i, :] = craw
 		craw = chirp_classic.calculate_raw(cx_d_dshift)
