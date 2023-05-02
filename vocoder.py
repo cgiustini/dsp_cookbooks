@@ -19,12 +19,22 @@ def plot_response(w, h, title):
 
 # f = [130, ]
 
-def get_formants(fft_x):
+def get_formants(fft_x, num_formats=10, idx_tol=200):
 
-    max_idx = np.flip(np.argsort(abs(fft_x)))
+    max_idx = np.flip(np.argsort(fft_x))
 
-    formant_idx = []
+    formant_idx = np.array([max_idx[0]])
+    for m in max_idx[1:-1]:
 
+        if len(formant_idx) >= num_formats:
+            break
+
+        if all(abs(formant_idx-m) > idx_tol):
+            formant_idx = np.append(formant_idx, m)
+
+    formant_amplitudes = fft_x[formant_idx]
+
+    return formant_idx, formant_amplitudes
 
 
 
@@ -39,30 +49,14 @@ fft_x = np.fft.fft(x)
 N = int(np.floor(len(x)/2))
 fft_x = abs(fft_x[0:N])
 
-max_idx = np.flip(np.argsort(fft_x))
+formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
 
-# max_idx = max_idx[0:20]
+# plt.plot(abs(fft_x))
 
-num_formats = 10
-idx_tol = 200
-
-
-formant_idx = np.array([max_idx[0]])
-for m in max_idx[1:-1]:
-
-    if len(formant_idx) >= num_formats:
-        break
-
-    if all(abs(formant_idx-m) > idx_tol):
-        formant_idx = np.append(formant_idx, m)
+# for m in formant_idx:
+#     plt.axvline(m, color='red')
 
 
-plt.plot(abs(fft_x))
-
-for m in formant_idx:
-    plt.axvline(m, color='red')
-
-formant_amplitudes = fft_x[formant_idx]
 
 L = 4096 * 50
 y = np.zeros(L, dtype=float)
