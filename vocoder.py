@@ -9,7 +9,7 @@ def plot_response(w, h, title):
     fig = plt.gcf()
     ax = fig.add_subplot(111)
     ax.plot(w, 20*np.log10(np.abs(h)))
-    ax.set_ylim(-40, 5)
+    # ax.set_ylim(-40, 5)
     ax.grid(True)
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Gain (dB)')
@@ -36,8 +36,52 @@ def get_formants(fft_x, num_formats=10, idx_tol=200):
 
     return formant_idx, formant_amplitudes
 
+def generate_synthetic_signal_from_formants(formant_idx, formant_amplitudes, L):
+    y = np.zeros(L, dtype=float)
+    for i in np.arange(len(formant_idx)):
+        y = y + np.sin(2 * np.pi * formant_idx[i] / (N*2) * np.arange(L)) * formant_amplitudes[i]
+    return y
 
+def lpf(y, cutoff, fs):       
+    band = [cutoff]  # Desired stop band, Hz
+    trans_width = 50   # Width of transition from pass to stop, Hz
+    numtaps = 4096       # Size of the FIR filter.
+    edges = [0, band[0], band[0] + trans_width, 0.5*fs]
+    taps = signal.remez(numtaps, edges, [1, 0], fs=fs)
+    y = signal.lfilter(taps, [1], y)
+    return y
 
+def generate_vocoder_filter(formant_idx, formant_amplitudes, max_formant_idx, fs, L):
+
+    all_taps = np.array([], dtype=float)
+
+    # for i in np.arange(len(formant_idx)):
+    for i in [0, 3, 5, 7]:
+
+        print(i)
+
+        # freq = float(formant_idx[i] * fs / max_formant_idx)
+        # band = [freq - 100, freq + 100]
+        # trans_width = 200
+        # numtaps = 375
+        # edges = [0, band[0] - trans_width, band[0], band[1], band[1] + trans_width, 0.5*fs]
+
+        # taps = signal.remez(numtaps, edges, [0, 1, 0], fs=fs) * formant_amplitudes[i]
+
+        freq = float(formant_idx[i] * fs / max_formant_idx)
+        band = [freq-10, freq+10]  # Desired stop band, Hz
+        trans_width = 10    # Width of transition from pass to stop, Hz
+        numtaps = 8192       # Size of the FIR filter.
+        edges = [0, band[0] - trans_width, band[0], band[1], band[1] + trans_width, 0.5*fs]
+        # print(edges)
+        taps = signal.remez(numtaps, edges, [0, 1, 0], fs=fs) * formant_amplitudes[i]
+
+        if all_taps.shape == (0,):
+            all_taps = taps
+        else:
+            all_taps = all_taps + taps
+    
+    return all_taps
 
 fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
@@ -45,24 +89,34 @@ fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaa
 x = x[:, 0]
 
 
-fft_x = np.fft.fft(x)
 N = int(np.floor(len(x)/2))
+fft_x = np.fft.fft(x)
 fft_x = abs(fft_x[0:N])
+
+freq = np.arange(N) / N *  (fs/2)
 
 formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
 
-# plt.plot(abs(fft_x))
+# plt.plot(freq, abs(fft_x))
 
 # for m in formant_idx:
 #     plt.axvline(m, color='red')
 
 
+L = N * 2
+y = generate_synthetic_signal_from_formants(formant_idx, formant_amplitudes, L)
 
-L = 4096 * 50
-y = np.zeros(L, dtype=float)
-for i in np.arange(len(formant_idx)):
+# all_taps = generate_vocoder_filter(formant_idx, formant_amplitudes, L, fs, L)
+# samples = np.random.normal(0, 1, size=L)
+# y = signal.lfilter(all_taps, [1], lpf(samples, 2000, fs))
+fft_y = np.fft.fft(y)
+fft_y = abs(fft_y[0:N])
 
-    y = y + np.sin(2 * np.pi * formant_idx[i] / (N*2) * np.arange(L)) * formant_amplitudes[i]
+# w, h = signal.freqz(all_taps, [1], worN=2000, fs=fs)
+# # plt.plot(freq, 20 * np.log10(fft_x))
+# plot_response(w, h, "Band-stop Filter")
+plt.plot(freq, 20 * np.log10(fft_x))
+plt.plot(freq, 20 * np.log10(fft_y))
 
 
 y = y / np.max(abs(y)) * np.max(abs(x))
@@ -148,13 +202,7 @@ wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder.wa
 #     print(i, len(t))
 #     for j in np.arange(len(voder_f)):
 #     # for j in [3]:
-#         freq = voder_f[j]
-#         band = [freq-100, freq+100]  # Desired stop band, Hz
-#         trans_width = 200    # Width of transition from pass to stop, Hz
-#         numtaps = 800        # Size of the FIR filter.
-#         edges = [0, band[0] - trans_width, band[0], band[1], band[1] + trans_width, 0.5*fs]
-#         # print(edges)
-#         taps = signal.remez(numtaps, edges, [0, 1, 0], fs=fs) * (voder_Sxx[j, i])
+
 
 #         if all_taps.shape == (0,):
 #             all_taps = taps
