@@ -83,15 +83,71 @@ def generate_vocoder_filter(formant_idx, formant_amplitudes, max_formant_idx, fs
     
     return all_taps
 
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
+
+def generate_vocoder_filter_2(formant_idx, formant_amplitudes, max_formant_idx, fs, L):
+
+    edges = [0]
+    desired = [0]
+
+    # for i in np.arange(len(formant_idx)):
+    for i in [0, 3,5 ,7]:
+
+        freq = float(formant_idx[i] * fs / max_formant_idx)
+        band = [freq-50, freq+50]  # Desired stop band, Hz
+        trans_width = 100    # Width of transition from pass to stop, Hz
+        
+        first_edge = band[0] - trans_width 
+        first_edge = first_edge if first_edge >=0 else 0
+        edges.append(first_edge)
+        edges.append(band[0])
+        edges.append(band[1])
+        edges.append(band[1] + trans_width)
+
+        desired.append(formant_amplitudes[i] / np.max(formant_amplitudes))
+        desired.append(0)
+
+    edges.append(0.5*fs)
+    
+
+
+    # IPython.embed()    
+
+    numtaps = 8192
+    taps = signal.remez(numtaps, edges, desired, fs=fs) 
+    
+    return taps
+
+def generate_vocoder_filter_3(x, formant_idx, formant_amplitudes, max_formant_idx, fs, L):
+
+    y = np.zeros(x.shape)
+
+    for i in np.arange(len(formant_idx)):
+    # for i in [0, 3,5 ,7]:
+        
+        freq = float(formant_idx[i] * fs / max_formant_idx)
+        print(freq)
+        Q = freq/100
+        b, a = signal.iirpeak(freq, Q, fs)
+        b = b * formant_amplitudes[i] / np.max(formant_amplitudes)
+
+        this_y = signal.lfilter(b, a, x)
+        y = y + this_y
+
+    return y
+
+fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav")
+fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
 x = x[:, 0]
+w = w[:, 0]
 
 
 N = int(np.floor(len(x)/2))
 fft_x = np.fft.fft(x)
 fft_x = abs(fft_x[0:N])
+fft_w = np.fft.fft(w)
+fft_w = abs(fft_w[0:N])
 
 freq = np.arange(N) / N *  (fs/2)
 
@@ -104,18 +160,21 @@ formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=20
 
 
 L = N * 2
-y = generate_synthetic_signal_from_formants(formant_idx, formant_amplitudes, L)
+# y = generate_synthetic_signal_from_formants(formant_idx, formant_amplitudes, L)
 
-# all_taps = generate_vocoder_filter(formant_idx, formant_amplitudes, L, fs, L)
-# samples = np.random.normal(0, 1, size=L)
-# y = signal.lfilter(all_taps, [1], lpf(samples, 2000, fs))
+# all_taps = generate_vocoder_filter_2(formant_idx, formant_amplitudes, L, fs, L)
+
+# all_taps = generate_vocoder_filter_2(formant_idx, formant_amplitudes, L, fs, L)
+
+samples = np.random.normal(0, 1, size=L)
+y = generate_vocoder_filter_3(w, formant_idx, formant_amplitudes, L, fs, L)
 fft_y = np.fft.fft(y)
 fft_y = abs(fft_y[0:N])
 
 # w, h = signal.freqz(all_taps, [1], worN=2000, fs=fs)
-# # plt.plot(freq, 20 * np.log10(fft_x))
 # plot_response(w, h, "Band-stop Filter")
 plt.plot(freq, 20 * np.log10(fft_x))
+plt.plot(freq, 20 * np.log10(fft_w))
 plt.plot(freq, 20 * np.log10(fft_y))
 
 
