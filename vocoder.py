@@ -117,33 +117,54 @@ def generate_vocoder_filter_2(formant_idx, formant_amplitudes, max_formant_idx, 
     
     return taps
 
-def generate_vocoder_filter_3(x, formant_idx, formant_amplitudes, max_formant_idx, fs, L):
+def generate_vocoder_filter_3(x, formant_freq, formant_amplitudes, max_formant_idx, fs):
 
     y = np.zeros(x.shape)
 
-    for i in np.arange(len(formant_idx)):
+    for i in np.arange(len(formant_freq)):
     # for i in [0, 3,5 ,7]:
         
-        freq = float(formant_idx[i] * fs / max_formant_idx)
-        print(freq)
+        freq = formant_freq[i]
         Q = freq/100
         b, a = signal.iirpeak(freq, Q, fs)
-        b = b * formant_amplitudes[i] / np.max(formant_amplitudes)
+        b = b * formant_amplitudes[i]
+
+        w, h = signal.freqz(b,a, worN=2000, fs=fs)
+        plot_response(w, h, "Band-stop Filter")
 
         this_y = signal.lfilter(b, a, x)
         y = y + this_y
 
+    plt.plot(formant_freq, 20 * np.log10(formant_amplitudes))
+
     return y
 
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav")
+    
+
+def freq_to_fft_idx(freq, N, fs):
+    fft_idx = np.round(freq / (fs/2) * N)
+    return fft_idx.astype(int)
+
+def fft_idx_to_freq(fft_idx, N, fs):
+    freq = fft_idx / N *  (fs/2)
+    return freq
+
+
+
+fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
 fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
 x = x[:, 0]
 w = w[:, 0]
 
+# x = x[0:44000]
+
 
 N = int(np.floor(len(x)/2))
+
+
 fft_x = np.fft.fft(x)
 fft_x = abs(fft_x[0:N])
 fft_w = np.fft.fft(w)
@@ -151,37 +172,73 @@ fft_w = abs(fft_w[0:N])
 
 freq = np.arange(N) / N *  (fs/2)
 
-formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
 
-# plt.plot(freq, abs(fft_x))
+filter_bank_freq_edges = np.arange(0, 2500, step=250, dtype=float)
 
-# for m in formant_idx:
-#     plt.axvline(m, color='red')
+filter_bank_freq_bands = []
+filter_bank_freq_centers = []
+
+for i in np.arange(len(filter_bank_freq_edges)-1):
+    band = [filter_bank_freq_edges[i], filter_bank_freq_edges[i+1]]
+    filter_bank_freq_bands.append(np.array(band))
+    filter_bank_freq_centers.append(np.mean(band))
+
+filter_bank_freq_bands = np.array(filter_bank_freq_bands)
+filter_bank_freq_centers = np.array(filter_bank_freq_centers)
+
+filter_bank_idx_bands = freq_to_fft_idx(filter_bank_freq_bands, N, fs)
+filter_bank_idx_centers = freq_to_fft_idx(filter_bank_freq_centers, N, fs)
+
+filter_bank_freq_pwrs = []
+
+for b in filter_bank_idx_bands:
+    filter_bank_freq_pwrs.append(np.sum(fft_x[b[0]:b[1]]))
+
+filter_bank_freq_pwrs = np.array(filter_bank_freq_pwrs) / np.max(filter_bank_freq_pwrs)
+
+y = generate_vocoder_filter_3(w, filter_bank_freq_centers, filter_bank_freq_pwrs, N, fs)
+
+# y = y / np.max(abs(y)) * np.max(abs(x))
+y = y / np.sqrt(np.mean(np.power(y,2))) * np.sqrt(np.mean(np.power(x,2))) * 100
+
+y = np.int16(y)
+
+fft_y = np.fft.fft(y)
+fft_y = abs(fft_y[0:N])
 
 
-L = N * 2
+# plt.plot(freq, 20 * np.log10(fft_x))
+# plt.plot(freq, 20 * np.log10(fft_w))
+# plt.plot(freq, 20 * np.log10(fft_y))
+
+wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder.wav", fs, y)
+
+
+# formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
+
+# # plt.plot(freq, abs(fft_x))
+
+# # for m in formant_idx:
+# #     plt.axvline(m, color='red')
+
+
+# L = N * 2
 # y = generate_synthetic_signal_from_formants(formant_idx, formant_amplitudes, L)
 
 # all_taps = generate_vocoder_filter_2(formant_idx, formant_amplitudes, L, fs, L)
 
 # all_taps = generate_vocoder_filter_2(formant_idx, formant_amplitudes, L, fs, L)
 
-samples = np.random.normal(0, 1, size=L)
-y = generate_vocoder_filter_3(w, formant_idx, formant_amplitudes, L, fs, L)
-fft_y = np.fft.fft(y)
-fft_y = abs(fft_y[0:N])
+# samples = np.random.normal(0, 1, size=L)
+# y = generate_vocoder_filter_3(w, formant_idx, formant_amplitudes, L, fs, L)
+# fft_y = np.fft.fft(y)
+# fft_y = abs(fft_y[0:N])
 
 # w, h = signal.freqz(all_taps, [1], worN=2000, fs=fs)
 # plot_response(w, h, "Band-stop Filter")
-plt.plot(freq, 20 * np.log10(fft_x))
-plt.plot(freq, 20 * np.log10(fft_w))
-plt.plot(freq, 20 * np.log10(fft_y))
 
 
-y = y / np.max(abs(y)) * np.max(abs(x))
 
-y = np.int16(y)
-wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder.wav", fs, y)
 
 # f = np.arange(0, len(x)) / len(x) * fs
 
