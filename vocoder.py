@@ -231,7 +231,7 @@ for i in np.arange(x_chunks.shape[0]):
     print(i, x.shape[0])
     y_chunks[i, :] = run_vocoder_on_chunk(x_chunks[i, :], w_chunks[i, :])
 
-y = np.reshape(y_chunks, (1, final_size))
+y = np.reshape(y_chunks, final_size)
 
 
 # y = run_vocoder_on_chunk(x, w)
