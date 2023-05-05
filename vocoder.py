@@ -151,67 +151,71 @@ def fft_idx_to_freq(fft_idx, N, fs):
 
 
 
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
-# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
+# x = x[0:44000]
+
+def run_vocoder_on_chunk(x, w):
+
+    N = int(np.floor(len(x)/2))
+
+    fft_x = np.fft.fft(x)
+    fft_x = abs(fft_x[0:N])
+    fft_w = np.fft.fft(w)
+    fft_w = abs(fft_w[0:N])
+
+    freq = np.arange(N) / N *  (fs/2)
+
+
+    filter_bank_freq_edges = np.arange(0, 2500, step=250, dtype=float)
+
+    filter_bank_freq_bands = []
+    filter_bank_freq_centers = []
+
+    for i in np.arange(len(filter_bank_freq_edges)-1):
+        band = [filter_bank_freq_edges[i], filter_bank_freq_edges[i+1]]
+        filter_bank_freq_bands.append(np.array(band))
+        filter_bank_freq_centers.append(np.mean(band))
+
+    filter_bank_freq_bands = np.array(filter_bank_freq_bands)
+    filter_bank_freq_centers = np.array(filter_bank_freq_centers)
+
+    filter_bank_idx_bands = freq_to_fft_idx(filter_bank_freq_bands, N, fs)
+    filter_bank_idx_centers = freq_to_fft_idx(filter_bank_freq_centers, N, fs)
+
+    filter_bank_freq_pwrs = []
+
+    for b in filter_bank_idx_bands:
+        filter_bank_freq_pwrs.append(np.sum(fft_x[b[0]:b[1]]))
+
+    filter_bank_freq_pwrs = np.array(filter_bank_freq_pwrs) / np.max(filter_bank_freq_pwrs)
+
+    y = generate_vocoder_filter_3(w, filter_bank_freq_centers, filter_bank_freq_pwrs, N, fs)
+
+    # y = y / np.max(abs(y)) * np.max(abs(x))
+    y = y / np.sqrt(np.mean(np.power(y,2))) * np.sqrt(np.mean(np.power(x,2))) * 100
+
+    y = np.int16(y)
+
+    fft_y = np.fft.fft(y)
+    fft_y = abs(fft_y[0:N])
+
+    return y
+
+
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
+fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
 fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
 x = x[:, 0]
 w = w[:, 0]
 
-# x = x[0:44000]
-
-
-N = int(np.floor(len(x)/2))
-
-
-fft_x = np.fft.fft(x)
-fft_x = abs(fft_x[0:N])
-fft_w = np.fft.fft(w)
-fft_w = abs(fft_w[0:N])
-
-freq = np.arange(N) / N *  (fs/2)
-
-
-filter_bank_freq_edges = np.arange(0, 2500, step=250, dtype=float)
-
-filter_bank_freq_bands = []
-filter_bank_freq_centers = []
-
-for i in np.arange(len(filter_bank_freq_edges)-1):
-    band = [filter_bank_freq_edges[i], filter_bank_freq_edges[i+1]]
-    filter_bank_freq_bands.append(np.array(band))
-    filter_bank_freq_centers.append(np.mean(band))
-
-filter_bank_freq_bands = np.array(filter_bank_freq_bands)
-filter_bank_freq_centers = np.array(filter_bank_freq_centers)
-
-filter_bank_idx_bands = freq_to_fft_idx(filter_bank_freq_bands, N, fs)
-filter_bank_idx_centers = freq_to_fft_idx(filter_bank_freq_centers, N, fs)
-
-filter_bank_freq_pwrs = []
-
-for b in filter_bank_idx_bands:
-    filter_bank_freq_pwrs.append(np.sum(fft_x[b[0]:b[1]]))
-
-filter_bank_freq_pwrs = np.array(filter_bank_freq_pwrs) / np.max(filter_bank_freq_pwrs)
-
-y = generate_vocoder_filter_3(w, filter_bank_freq_centers, filter_bank_freq_pwrs, N, fs)
-
-# y = y / np.max(abs(y)) * np.max(abs(x))
-y = y / np.sqrt(np.mean(np.power(y,2))) * np.sqrt(np.mean(np.power(x,2))) * 100
-
-y = np.int16(y)
-
-fft_y = np.fft.fft(y)
-fft_y = abs(fft_y[0:N])
-
+y = run_vocoder_on_chunk(x, w)
 
 # plt.plot(freq, 20 * np.log10(fft_x))
 # plt.plot(freq, 20 * np.log10(fft_w))
 # plt.plot(freq, 20 * np.log10(fft_y))
 
-wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder.wav", fs, y)
+wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_sh.wav", fs, y)
 
 
 # formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
