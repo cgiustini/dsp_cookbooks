@@ -125,17 +125,20 @@ def generate_vocoder_filter_3(x, formant_freq, formant_amplitudes, max_formant_i
     # for i in [0, 3,5 ,7]:
         
         freq = formant_freq[i]
-        Q = freq/100
+        Q = freq/10
         b, a = signal.iirpeak(freq, Q, fs)
         b = b * formant_amplitudes[i]
 
-        w, h = signal.freqz(b,a, worN=2000, fs=fs)
-        plot_response(w, h, "Band-stop Filter")
+
+        if i==3:
+            w, h = signal.freqz(b,a, worN=2000, fs=fs)
+            plot_response(w, h, "Band-stop Filter")
 
         this_y = signal.lfilter(b, a, x)
         y = y + this_y
 
-    plt.plot(formant_freq, 20 * np.log10(formant_amplitudes))
+    # plt.figure()
+    # plt.plot(formant_freq, 20 * np.log10(formant_amplitudes))
 
     return y
 
@@ -165,7 +168,7 @@ def run_vocoder_on_chunk(x, w):
     freq = np.arange(N) / N *  (fs/2)
 
 
-    filter_bank_freq_edges = np.arange(0, 2500, step=250, dtype=float)
+    filter_bank_freq_edges = np.arange(0, 2500, step=100, dtype=float)
 
     filter_bank_freq_bands = []
     filter_bank_freq_centers = []
@@ -202,20 +205,43 @@ def run_vocoder_on_chunk(x, w):
 
 
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_sh.wav")
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav")
+fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav")
 fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
 x = x[:, 0]
 w = w[:, 0]
 
-y = run_vocoder_on_chunk(x, w)
+chunk_size = 22000
+
+num_chunks = int(np.floor(len(x) / chunk_size))
+
+final_size = chunk_size * num_chunks
+
+x_chunks = np.reshape(x[0:final_size], (num_chunks, chunk_size))
+w_chunks = np.reshape(w[0:final_size], (num_chunks, chunk_size))
+
+
+y_chunks = np.zeros(x_chunks.shape, dtype=np.int16)
+
+for i in np.arange(x_chunks.shape[0]):
+    print(i, x.shape[0])
+    y_chunks[i, :] = run_vocoder_on_chunk(x_chunks[i, :], w_chunks[i, :])
+
+y = np.reshape(y_chunks, final_size)
+
+
+# y = run_vocoder_on_chunk(x, w)
 
 # plt.plot(freq, 20 * np.log10(fft_x))
 # plt.plot(freq, 20 * np.log10(fft_w))
 # plt.plot(freq, 20 * np.log10(fft_y))
 
-wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_sh.wav", fs, y)
+# wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_ah_oh.wav", fs, y)
+wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_zoo.wav", fs, y)
 
 
 # formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
