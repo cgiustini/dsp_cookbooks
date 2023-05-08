@@ -9,6 +9,7 @@ def plot_response(w, h, title):
     fig = plt.gcf()
     ax = fig.add_subplot(111)
     ax.plot(w, 20*np.log10(np.abs(h)))
+    ax.set_xscale('log')
     # ax.set_ylim(-40, 5)
     ax.grid(True)
     ax.set_xlabel('Frequency (Hz)')
@@ -120,29 +121,37 @@ def generate_vocoder_filter_2(formant_idx, formant_amplitudes, max_formant_idx, 
 def generate_vocoder_filter_3(x, formant_freq, formant_amplitudes, max_formant_idx, fs):
 
     y = np.zeros(x.shape)
+    h = np.zeros(max_formant_idx)
 
     for i in np.arange(len(formant_freq)):
-    # for i in [0, 3,5 ,7]:
+    # for i in [0]:
+
         
         freq = formant_freq[i]
         Q = freq/10
-        b, a = signal.iirpeak(freq, Q, fs)
+        # b, a = signal.iirpeak(freq, Q, fs)
+        print(freq)
+        b, a = signal.butter(3, [freq - freq * 0.1, freq + freq * 0.1], 'bandpass', fs=fs, analog=False)
+        # b, a = signal.butter(5, 3000, 'low', fs=fs, analog=False)
         b = b * formant_amplitudes[i]
 
-
-        if i==3:
-            w, h = signal.freqz(b,a, worN=2000, fs=fs)
-            plot_response(w, h, "Band-stop Filter")
+        w, this_h = signal.freqz(b,a, worN=max_formant_idx, fs=fs)
+        # plot_response(w, h, "Band-stop Filter")
+        h = this_h + h
 
         this_y = signal.lfilter(b, a, x)
         y = y + this_y
 
     # plt.figure()
-    # plt.plot(formant_freq, 20 * np.log10(formant_amplitudes))
+    
+    plot_response(w, h, "Band-stop Filter")
+    plt.plot(formant_freq, 20 * np.log10(formant_amplitudes), 'o-')
 
     return y
 
-    
+# b, a = signal.butter(3, [300, 500], 'bandpass', fs=fs, analog=False)
+# w, h = signal.freqz(b,a, worN=2000, fs=fs)
+# plot_response(w, h, "Band-stop Filter")
 
 def freq_to_fft_idx(freq, N, fs):
     fft_idx = np.round(freq / (fs/2) * N)
@@ -167,19 +176,33 @@ def run_vocoder_on_chunk(x, w):
 
     freq = np.arange(N) / N *  (fs/2)
 
+    start_freq = 100
+    stop_freq = 10000
 
-    filter_bank_freq_edges = np.arange(0, 2500, step=100, dtype=float)
+    # filter_bank_freq_edges = np.arange(np.log10(start_freq(), 2500, step=400, dtype=float)
 
+    # filter_bank_freq_edges = np.arange(0, 2500, step=400, dtype=float)
+
+    # filter_bank_freq_bands = []
+    # filter_bank_freq_centers = []
+
+    # for i in np.arange(len(filter_bank_freq_edges)-1):
+    #     band = [filter_bank_freq_edges[i], filter_bank_freq_edges[i+1]]
+    #     filter_bank_freq_bands.append(np.array(band))
+    #     filter_bank_freq_centers.append(np.mean(band))
+
+    num_bands = 16
+    bw_factor = 0.1
+    filter_bank_freq_centers = np.logspace(np.log10(start_freq), np.log10(stop_freq), num_bands)
+    print(filter_bank_freq_centers)
     filter_bank_freq_bands = []
-    filter_bank_freq_centers = []
-
-    for i in np.arange(len(filter_bank_freq_edges)-1):
-        band = [filter_bank_freq_edges[i], filter_bank_freq_edges[i+1]]
+    for i in np.arange(len(filter_bank_freq_centers)):
+        freq = filter_bank_freq_centers[i]
+        band = [freq - freq * bw_factor, freq + bw_factor]
         filter_bank_freq_bands.append(np.array(band))
-        filter_bank_freq_centers.append(np.mean(band))
 
     filter_bank_freq_bands = np.array(filter_bank_freq_bands)
-    filter_bank_freq_centers = np.array(filter_bank_freq_centers)
+    # filter_bank_freq_centers = np.array(filter_bank_freq_centers)
 
     filter_bank_idx_bands = freq_to_fft_idx(filter_bank_freq_bands, N, fs)
     filter_bank_idx_centers = freq_to_fft_idx(filter_bank_freq_centers, N, fs)
@@ -215,7 +238,7 @@ fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\key
 x = x[:, 0]
 w = w[:, 0]
 
-chunk_size = 22000
+chunk_size = len(x)
 
 num_chunks = int(np.floor(len(x) / chunk_size))
 
