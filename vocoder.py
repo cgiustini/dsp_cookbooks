@@ -118,22 +118,20 @@ def generate_vocoder_filter_2(formant_idx, formant_amplitudes, max_formant_idx, 
     
     return taps
 
-def generate_vocoder_filter_3(x, formant_freq, formant_amplitudes, max_formant_idx, fs):
+def generate_vocoder_filter_3(x, band_freqs, band_amplitudes, max_formant_idx, fs):
 
     y = np.zeros(x.shape)
     h = np.zeros(max_formant_idx)
 
-    for i in np.arange(len(formant_freq)):
+    for i in np.arange(band_freqs.shape[0]):
     # for i in [0]:
 
-        
-        freq = formant_freq[i]
-        Q = freq/10
-        # b, a = signal.iirpeak(freq, Q, fs)
+        # [freq - freq * 0.3, freq + freq * 0.3]
+        freq = band_freqs[i, :]
         print(freq)
-        b, a = signal.butter(3, [freq - freq * 0.1, freq + freq * 0.1], 'bandpass', fs=fs, analog=False)
+        b, a = signal.butter(3, freq, 'bandpass', fs=fs, analog=False)
         # b, a = signal.butter(5, 3000, 'low', fs=fs, analog=False)
-        b = b * formant_amplitudes[i]
+        b = b * band_amplitudes[i]
 
         w, this_h = signal.freqz(b,a, worN=max_formant_idx, fs=fs)
         # plot_response(w, h, "Band-stop Filter")
@@ -144,10 +142,10 @@ def generate_vocoder_filter_3(x, formant_freq, formant_amplitudes, max_formant_i
 
     # plt.figure()
     
-    plot_response(w, h, "Band-stop Filter")
-    plt.plot(formant_freq, 20 * np.log10(formant_amplitudes), 'o-')
+    # plot_response(w, h, "Band-stop Filter")
+    # plt.plot(formant_freq, 20 * np.log10(formant_amplitudes), 'o-')
 
-    return y
+    return (y, h)
 
 # b, a = signal.butter(3, [300, 500], 'bandpass', fs=fs, analog=False)
 # w, h = signal.freqz(b,a, worN=2000, fs=fs)
@@ -174,7 +172,7 @@ def run_vocoder_on_chunk(x, w):
     fft_w = np.fft.fft(w)
     fft_w = abs(fft_w[0:N])
 
-    freq = np.arange(N) / N *  (fs/2)
+    plot_freq = np.arange(N) / N *  (fs/2)
 
     start_freq = 100
     stop_freq = 10000
@@ -192,7 +190,7 @@ def run_vocoder_on_chunk(x, w):
     #     filter_bank_freq_centers.append(np.mean(band))
 
     num_bands = 16
-    bw_factor = 0.1
+    bw_factor = 0.3
     filter_bank_freq_centers = np.logspace(np.log10(start_freq), np.log10(stop_freq), num_bands)
     print(filter_bank_freq_centers)
     filter_bank_freq_bands = []
@@ -210,28 +208,47 @@ def run_vocoder_on_chunk(x, w):
     filter_bank_freq_pwrs = []
 
     for b in filter_bank_idx_bands:
-        filter_bank_freq_pwrs.append(np.sum(fft_x[b[0]:b[1]]))
+        idx_to_sum = np.arange(b[0], b[1])
+        mean_pwr = np.sum(fft_x[idx_to_sum]) / len(idx_to_sum)
+        filter_bank_freq_pwrs.append(mean_pwr)
 
     filter_bank_freq_pwrs = np.array(filter_bank_freq_pwrs) / np.max(filter_bank_freq_pwrs)
 
-    y = generate_vocoder_filter_3(w, filter_bank_freq_centers, filter_bank_freq_pwrs, N, fs)
+    (y, h) = generate_vocoder_filter_3(w, filter_bank_freq_bands, filter_bank_freq_pwrs, N, fs)
 
-    # y = y / np.max(abs(y)) * np.max(abs(x))
     y = y / np.sqrt(np.mean(np.power(y,2))) * np.sqrt(np.mean(np.power(x,2))) * 100
-
     y = np.int16(y)
 
     fft_y = np.fft.fft(y)
     fft_y = abs(fft_y[0:N])
+    fft_w = np.fft.fft(w)
+    fft_w = abs(fft_w[0:N])
+    
+    plt.figure()
+    plt.plot(plot_freq, 20 * np.log10(fft_x/ np.max(fft_x)))
+    plt.plot(plot_freq, 20 * np.log10(abs(h)  / np.max(abs(h))))
+    plt.plot(filter_bank_freq_centers, 20 * np.log10(filter_bank_freq_pwrs), 'o-')
+    ax = plt.gca()
+    ax.set_xscale('log')
+    
+    plt.figure()
+    plt.plot(plot_freq, 20 * np.log10(fft_w/ np.max(fft_w)))
+    plt.plot(plot_freq, 20 * np.log10(abs(h)  / np.max(abs(h))))
+    plt.plot(plot_freq, 20 * np.log10(fft_y/ np.max(fft_y)))
+    ax = plt.gca()
+    ax.set_xscale('log')
+
+    IPython.embed()
+
 
     return y
 
 
-# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh.wav")
+fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_sh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav")
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav")
+# fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav")
 fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
@@ -264,7 +281,8 @@ y = np.reshape(y_chunks, final_size)
 # plt.plot(freq, 20 * np.log10(fft_y))
 
 # wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_ah_oh.wav", fs, y)
-wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_zoo.wav", fs, y)
+# wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_ah2.wav", fs, y)
+wavfile.write(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\vocoder_ah2.wav", fs, y)
 
 
 # formant_idx, formant_amplitudes = get_formants(fft_x, num_formats=10, idx_tol=200)
