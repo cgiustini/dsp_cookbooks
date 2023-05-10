@@ -4,6 +4,34 @@ import  scipy.signal as signal
 import matplotlib.pyplot as plt
 import IPython
 
+from moviepy.editor import VideoClip
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
+from moviepy.video.io.bindings import mplfig_to_npimage
+
+
+def make_movie(figs):
+    # duration of the video
+    duration = 2
+
+    fps = 10
+    duration = len(figs) / fps
+    
+    # method to get frames
+    def make_frame(t):
+        
+        i = int(t * 10)
+
+        print(i)
+
+        # returning numpy image
+        return mplfig_to_npimage(figs[i])
+    
+    # creating animation
+    animation = VideoClip(make_frame, duration = duration)
+    
+    # displaying animation with auto play and looping
+    animation.ipython_display(fps = fps, loop = False, autoplay = False)
+
 def plot_response(w, h, title):
     "Utility function to plot response functions"
     fig = plt.gcf()
@@ -58,8 +86,6 @@ def generate_vocoder_filter(formant_idx, formant_amplitudes, max_formant_idx, fs
 
     # for i in np.arange(len(formant_idx)):
     for i in [0, 3, 5, 7]:
-
-        print(i)
 
         # freq = float(formant_idx[i] * fs / max_formant_idx)
         # band = [freq - 100, freq + 100]
@@ -128,7 +154,7 @@ def generate_vocoder_filter_3(x, band_freqs, band_amplitudes, max_formant_idx, f
 
         # [freq - freq * 0.3, freq + freq * 0.3]
         freq = band_freqs[i, :]
-        print(freq)
+        # print(freq)
         b, a = signal.butter(3, freq, 'bandpass', fs=fs, analog=False)
         # b, a = signal.butter(5, 3000, 'low', fs=fs, analog=False)
         b = b * band_amplitudes[i]
@@ -192,7 +218,7 @@ def run_vocoder_on_chunk(x, w):
     num_bands = 16
     bw_factor = 0.3
     filter_bank_freq_centers = np.logspace(np.log10(start_freq), np.log10(stop_freq), num_bands)
-    print(filter_bank_freq_centers)
+    # print(filter_bank_freq_centers)
     filter_bank_freq_bands = []
     for i in np.arange(len(filter_bank_freq_centers)):
         freq = filter_bank_freq_centers[i]
@@ -224,38 +250,45 @@ def run_vocoder_on_chunk(x, w):
     fft_w = np.fft.fft(w)
     fft_w = abs(fft_w[0:N])
     
-    plt.figure()
+    fig = plt.figure()
     plt.plot(plot_freq, 20 * np.log10(fft_x/ np.max(fft_x)))
     plt.plot(plot_freq, 20 * np.log10(abs(h)  / np.max(abs(h))))
-    plt.plot(filter_bank_freq_centers, 20 * np.log10(filter_bank_freq_pwrs), 'o-')
+    # plt.plot(filter_bank_freq_centers, 20 * np.log10(filter_bank_freq_pwrs), 'o-')
     ax = plt.gca()
+    ax.set_xlim([50, 20000])
     ax.set_xscale('log')
     
-    plt.figure()
-    plt.plot(plot_freq, 20 * np.log10(fft_w/ np.max(fft_w)))
-    plt.plot(plot_freq, 20 * np.log10(abs(h)  / np.max(abs(h))))
-    plt.plot(plot_freq, 20 * np.log10(fft_y/ np.max(fft_y)))
-    ax = plt.gca()
-    ax.set_xscale('log')
+    
+    # plt.figure()
+    # plt.plot(plot_freq, 20 * np.log10(fft_w/ np.max(fft_w)))
+    # plt.plot(plot_freq, 20 * np.log10(abs(h)  / np.max(abs(h))))
+    # plt.plot(plot_freq, 20 * np.log10(fft_y/ np.max(fft_y)))
+    # ax = plt.gca()
+    # ax.set_xscale('log')
 
-    IPython.embed()
-
-
-    return y
+    # IPython.embed()
 
 
-fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav")
+    return (y, fig)
+
+# audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav"
+# audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav"
+audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav"
+fs, x = wavfile.read(audio_file)
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_sh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav")
-fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
+# fs, w = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\silence.wav")
 
-x = x[:, 0]
-w = w[:, 0]
 
-chunk_size = len(x)
+x = x[:, 0]
+# w = w[:, 0]
+w = np.random.randn(len(x))
+
+# chunk_size = int(fs/2)
+chunk_size = int(fs/10)
 
 num_chunks = int(np.floor(len(x) / chunk_size))
 
@@ -267,11 +300,20 @@ w_chunks = np.reshape(w[0:final_size], (num_chunks, chunk_size))
 
 y_chunks = np.zeros(x_chunks.shape, dtype=np.int16)
 
+figs = []
 for i in np.arange(x_chunks.shape[0]):
     print(i, x.shape[0])
-    y_chunks[i, :] = run_vocoder_on_chunk(x_chunks[i, :], w_chunks[i, :])
+    (y_chunks[i, :], this_fig) = run_vocoder_on_chunk(x_chunks[i, :], w_chunks[i, :])
+    figs.append(this_fig)
 
 y = np.reshape(y_chunks, final_size)
+
+make_movie(figs)
+
+video_clip = VideoFileClip(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\__temp__.mp4")
+audio_clip = AudioFileClip(audio_file)
+final_clip = video_clip.set_audio(audio_clip)
+final_clip.write_videofile("final.mp4")
 
 
 # y = run_vocoder_on_chunk(x, w)
