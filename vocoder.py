@@ -242,8 +242,9 @@ def run_vocoder_on_chunk(x, w):
 
     (y, h) = generate_vocoder_filter_3(w, filter_bank_freq_bands, filter_bank_freq_pwrs, N, fs)
 
-    y = y / np.sqrt(np.mean(np.power(y,2))) * np.sqrt(np.mean(np.power(x,2))) * 100
-    y = np.int16(y)
+
+    # y = y / np.sqrt(np.mean(np.power(y,2,dtype=float))) * np.sqrt(np.mean(np.power(x,2,dtype=float))) * 100
+    y =  np.int16(y / np.max(abs(y)) * np.max(abs(x)))
 
     fft_y = np.fft.fft(y)
     fft_y = abs(fft_y[0:N])
@@ -271,10 +272,17 @@ def run_vocoder_on_chunk(x, w):
 
     return (y, fig)
 
-# audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav"
-# audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav"
-audio_file = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav"
-fs, x = wavfile.read(audio_file)
+# audio_file_x = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\aaahhhh_2.wav"
+audio_file_x = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\zoo.wav"
+# audio_file_x = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording_2.wav"
+# audio_file_x = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav"
+
+audio_file_w = r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\keyboard_recording.wav"
+
+fs, x = wavfile.read(audio_file_x)
+fs, w = wavfile.read(audio_file_w)
+# w = np.random.randn(len(x))
+
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ssshhh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_sh.wav")
 # fs, x = wavfile.read(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\samples\ah_oh.wav")
@@ -284,16 +292,17 @@ fs, x = wavfile.read(audio_file)
 
 
 x = x[:, 0]
-# w = w[:, 0]
-w = np.random.randn(len(x))
+w = w[:, 0]
+
 
 # chunk_size = int(fs/2)
-chunk_size = int(fs/10)
+chunk_size = int(fs/20)
 
 num_chunks = int(np.floor(len(x) / chunk_size))
 
 final_size = chunk_size * num_chunks
-
+time_idx = np.arange(final_size)
+time_idx_chunks = np.reshape(time_idx, (num_chunks, chunk_size))
 x_chunks = np.reshape(x[0:final_size], (num_chunks, chunk_size))
 w_chunks = np.reshape(w[0:final_size], (num_chunks, chunk_size))
 
@@ -305,15 +314,28 @@ for i in np.arange(x_chunks.shape[0]):
     print(i, x.shape[0])
     (y_chunks[i, :], this_fig) = run_vocoder_on_chunk(x_chunks[i, :], w_chunks[i, :])
     figs.append(this_fig)
+    plt.close(this_fig)
+
+    # if i==3:
+        # IPython.embed()
+
+    plt.figure(1000)
+    plt.plot(time_idx_chunks[i, :], y_chunks[i, :])
+
+    plt.figure(1001)
+    plt.plot(time_idx_chunks[i, :], x_chunks[i, :])
+        # plt.plot(x_chunks[i, :] / np.max(abs(x_chunks[i, :])))
+        # plt.plot(w_chunks[i, :] / np.max(abs(w_chunks[i, :])))
+        # plt.plot(y_chunks[i, :] / np.max(abs(y_chunks[i, :])))
 
 y = np.reshape(y_chunks, final_size)
 
-make_movie(figs)
+# make_movie(figs)
 
-video_clip = VideoFileClip(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\__temp__.mp4")
-audio_clip = AudioFileClip(audio_file)
-final_clip = video_clip.set_audio(audio_clip)
-final_clip.write_videofile("final.mp4")
+# video_clip = VideoFileClip(r"C:\Users\Carlo Giustini\Desktop\dsp_cookbooks\__temp__.mp4")
+# audio_clip = AudioFileClip(audio_file)
+# final_clip = video_clip.set_audio(audio_clip)
+# final_clip.write_videofile("final.mp4")
 
 
 # y = run_vocoder_on_chunk(x, w)
