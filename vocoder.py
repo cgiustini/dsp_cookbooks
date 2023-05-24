@@ -8,6 +8,38 @@ from moviepy.editor import VideoClip
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 from moviepy.video.io.bindings import mplfig_to_npimage
 
+class Filter:
+
+    def __init__(self, N):
+        self.x_memory = np.zeros(N)
+        self.y_memory = np.zeros(N)
+    
+    def run(self, x_sample, b, a):
+        
+        self.x_memory = np.roll(self.x_memory, 1)
+        self.y_memory = np.roll(self.y_memory, 1)
+
+        self.x_memory[0] = x_sample
+
+        self.y_memory[0] = np.dot(self.x_memory, b) - np.dot(self.y_memory[1:], a[1:])
+
+        y_sample = self.y_memory[0]
+
+        return y_sample
+
+def run_filter(x, b, a):
+
+    N = len(b)
+
+    f = Filter(N)
+
+    y = np.zeros(x.shape)
+
+    for i in np.arange(len(x)):
+        y[i] = f.run(x[i], b, a)
+
+    return y
+
 
 def make_movie(figs):
     # duration of the video
@@ -160,6 +192,7 @@ def generate_vocoder_filter_3(x, band_freqs, band_amplitudes, max_formant_idx, f
         b = b * band_amplitudes[i]
 
         w, this_h = signal.freqz(b,a, worN=max_formant_idx, fs=fs)
+
         # plot_response(w, h, "Band-stop Filter")
         h = this_h + h
 
@@ -216,7 +249,8 @@ def apply_vocoder_filter(x, b_list, a_list):
         b = b_list[i]
         a = a_list[i]
 
-        this_y = signal.lfilter(b, a, x)
+        # this_y = signal.lfilter(b, a, x)
+        this_y = run_filter(x, b, a)
         y = y + this_y
 
     return y
