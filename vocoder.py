@@ -23,9 +23,7 @@ class Filter:
 
         self.y_memory[0] = np.dot(self.x_memory, b) - np.dot(self.y_memory[1:], a[1:])
 
-        y_sample = self.y_memory[0]
-
-        return y_sample
+        return self.y_memory[0]
 
 def run_filter(x, b, a):
 
@@ -230,9 +228,6 @@ def generate_vocoder_filter_4(band_freqs, band_amplitudes, max_formant_idx, fs):
         w, this_h = signal.freqz(b, a, worN=max_formant_idx, fs=fs)
         # plot_response(w, h, "Band-stop Filter")
         h = this_h + h
-
-        # this_y = signal.lfilter(b, a, x)
-        # y = y + this_y
 
     # plt.figure()
     
