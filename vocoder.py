@@ -173,6 +173,54 @@ def generate_vocoder_filter_3(x, band_freqs, band_amplitudes, max_formant_idx, f
 
     return (y, h)
 
+def generate_vocoder_filter_4(band_freqs, band_amplitudes, max_formant_idx, fs):
+
+    h = np.zeros(max_formant_idx)
+    Nord = 3
+
+    a_list = []
+    b_list = []
+
+    for i in np.arange(band_freqs.shape[0]):
+    # for i in [0]:
+
+        # [freq - freq * 0.3, freq + freq * 0.3]
+        freq = band_freqs[i, :]
+        # print(freq)
+        b, a = signal.butter(Nord, freq, 'bandpass', fs=fs, analog=False)
+        # b, a = signal.butter(5, 3000, 'low', fs=fs, analog=False)
+        b = b * band_amplitudes[i]
+
+        a_list.append(a)
+        b_list.append(b)
+
+        w, this_h = signal.freqz(b, a, worN=max_formant_idx, fs=fs)
+        # plot_response(w, h, "Band-stop Filter")
+        h = this_h + h
+
+        # this_y = signal.lfilter(b, a, x)
+        # y = y + this_y
+
+    # plt.figure()
+    
+    # plot_response(w, h, "Band-stop Filter")
+    # plt.plot(formant_freq, 20 * np.log10(formant_amplitudes), 'o-')
+
+    return (b_list, a_list, h)
+
+def apply_vocoder_filter(x, b_list, a_list):
+
+    y = np.zeros(x.shape)
+
+    for i in np.arange(len(b_list)):
+        b = b_list[i]
+        a = a_list[i]
+
+        this_y = signal.lfilter(b, a, x)
+        y = y + this_y
+
+    return y
+
 # b, a = signal.butter(3, [300, 500], 'bandpass', fs=fs, analog=False)
 # w, h = signal.freqz(b,a, worN=2000, fs=fs)
 # plot_response(w, h, "Band-stop Filter")
@@ -240,8 +288,9 @@ def run_vocoder_on_chunk(x, w):
 
     filter_bank_freq_pwrs = np.array(filter_bank_freq_pwrs) / np.max(filter_bank_freq_pwrs)
 
-    (y, h) = generate_vocoder_filter_3(w, filter_bank_freq_bands, filter_bank_freq_pwrs, N, fs)
-
+    # (y, h) = generate_vocoder_filter_3(w, filter_bank_freq_bands, filter_bank_freq_pwrs, N, fs)
+    (b_list, a_list, h) = generate_vocoder_filter_4(filter_bank_freq_bands, filter_bank_freq_pwrs, N, fs)
+    y = apply_vocoder_filter(w, b_list, a_list)
 
     # y = y / np.sqrt(np.mean(np.power(y,2,dtype=float))) * np.sqrt(np.mean(np.power(x,2,dtype=float))) * 100
     y =  np.int16(y / np.max(abs(y)) * np.max(abs(x)))
